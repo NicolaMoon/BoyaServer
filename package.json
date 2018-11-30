@@ -1,0 +1,16 @@
+{
+  "name": "boyaserver",
+  "version": "1.0.0",
+  "description": "The server of boya1.0 SPA",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Nicola",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.4",
+    "mysql": "^2.16.0",
+    "socket.io": "^2.1.1"
+  }
+}
