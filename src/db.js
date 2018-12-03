@@ -3,7 +3,7 @@ var db={};
 
 exports.query=function(sqllan,fn){
     var connection=mysql.createConnection({
-        host: '127.0.0.1',
+        host: 'localhost',
         user: 'root',
         password: '123456',
         port: '3306',

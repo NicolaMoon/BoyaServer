@@ -59,98 +59,45 @@ io.sockets.on('connection',function (socket) {
 
                     //获取并发送信息列表
                     //获取朋友列表
-                    let sqllan2='select friend.friendAccount,friend.nonRead,user.username,memory.talker,memory.time,memory.msg,memory.memoryId';
-                    sqllan2+=' from memory join friend on friend.memoryId=memory.memoryId and friend.account='+data.account;
-                    sqllan2+=' join user on friend.friendAccount=user.account';
-                    // sqllan2+=' where talker='+data.account;
-                    sqllan2+=' order by memory.time desc';
-                    db.query(sqllan2,function (res2) {
-                        let msgList=[];
-                        let friends={};
-                        for(let item of res2){
-                            if(item.memoryId in friends){
-                            }else{
-                                friends[item.memoryId]=item.username;
-                                let thisMsg={};
-                                thisMsg.id=item.friendAccount;
-                                thisMsg.nonRead=item.nonRead;
-                                thisMsg.name=item.username;
-                                thisMsg.lastMsg={};
-                                if(item.talker === data.account){
-                                    thisMsg.lastMsg.talker=itsname;
+                    function sendFriendList(){
+                        let sqllan2='select friend.friendAccount,friend.nonRead,user.username,memory.talker,memory.time,memory.msg,memory.memoryId';
+                        sqllan2+=' from memory join friend on friend.memoryId=memory.memoryId and friend.account='+data.account;
+                        sqllan2+=' join user on friend.friendAccount=user.account';
+                        // sqllan2+=' where talker='+data.account;
+                        sqllan2+=' order by memory.time desc';
+                        db.query(sqllan2,function (res2) {
+                            let msgList=[];
+                            let friends={};
+                            for(let item of res2){
+                                if(item.memoryId in friends){
                                 }else{
-                                    thisMsg.lastMsg.talker=item.username;
+                                    friends[item.memoryId]=item.username;
+                                    let thisMsg={};
+                                    thisMsg.id=item.friendAccount;
+                                    thisMsg.nonRead=item.nonRead;
+                                    thisMsg.name=item.username;
+                                    thisMsg.lastMsg={};
+                                    if(item.talker === data.account){
+                                        thisMsg.lastMsg.talker=itsname;
+                                    }else{
+                                        thisMsg.lastMsg.talker=item.username;
+                                    }
+                                    var nowTime=new Date().Format('dd/MM/yyyy');
+                                    if(nowTime ===item.time.Format('dd/MM/yyyy')){
+                                        thisMsg.lastMsg.time=item.time.Format('hh:mm');
+                                    }else{
+                                        thisMsg.lastMsg.time=item.time.Format('yyyy/MM/dd');
+                                    }
+                                    thisMsg.lastMsg.msg=item.msg;
+                                    msgList.push(thisMsg);
                                 }
-                                var nowTime=new Date().Format('dd/MM/yyyy');
-                                if(nowTime ===item.time.Format('dd/MM/yyyy')){
-                                    thisMsg.lastMsg.time=item.time.Format('hh:mm');
-                                }else{
-                                    thisMsg.lastMsg.time=item.time.Format('yyyy/MM/dd');
-                                }
-                                thisMsg.lastMsg.msg=item.msg;
-                                msgList.push(thisMsg);
                             }
-                        }
-                        socket.emit('getMsgList',{
-                            msgList:msgList
+                            socket.emit('getMsgList',{
+                                msgList:msgList
+                            });
                         });
-                    });
-
-                    // db.query('select * from friend where account='+data.account,function (res2) {
-                    //     let msgList=[];
-                    //     let count=0;
-                    //     if(res2.length>=1){
-                    //         for(let item of res2){
-                    //             let thisMsg={};
-                    //             thisMsg.id=item.friendAccount;
-                    //             thisMsg.nonRead=item.nonRead;
-                    //             thisMsg.lastMsg={};
-                    //             //获取朋友名
-                    //             db.query('select username from user where account='+item.friendAccount,function (res3) {
-                    //                 if(res3.length === 1){
-                    //                     thisMsg.name=res3[0].username;
-                    //                     //获取信息列表
-                    //                     db.query('select * from memory where memoryId='+item.memoryId+' order by time DESC',function (res4) {
-                    //                         if(res4.length>=1){
-                    //                             db.query('select username from user where account='+res4[0].talker,function (res5) {
-                    //                                 if(res5.length === 1){
-                    //                                     thisMsg.lastMsg.talker=res5[0].username;
-                    //
-                    //                                     var nowTime=new Date().Format('dd/MM/yyyy');
-                    //                                     if(nowTime === res4[0].time.Format('dd/MM/yyyy')){
-                    //                                         thisMsg.lastMsg.time=res4[0].time.Format('hh:mm');
-                    //                                     }else{
-                    //                                         thisMsg.lastMsg.time=res4[0].time.Format('yyyy/MM/dd');
-                    //                                     }
-                    //                                     thisMsg.lastMsg.msg=res4[0].msg;
-                    //                                     msgList.push(thisMsg);
-                    //                                     count+=1;
-                    //                                     if(count === res2.length){
-                    //                                         socket.emit('getMsgList',{
-                    //                                             msgList:msgList
-                    //                                         });
-                    //                                     }
-                    //                                 }
-                    //                             })
-                    //                         }else{
-                    //                             msgList.push(thisMsg);
-                    //                             count+=1;
-                    //                             if(count === res2.length){
-                    //                                 socket.emit('getMsgList',{
-                    //                                     msgList:msgList
-                    //                                 });
-                    //                             }
-                    //                         }
-                    //                     })
-                    //                 }
-                    //             });
-                    //         }
-                    //     }else{
-                    //         socket.emit('getMsgList',{
-                    //             msgList:msgList
-                    //         });
-                    //     }
-                    // });
+                    }
+                    sendFriendList();
 
                     //获取并发送朋友群组表
                     let sqllan3='select friend.account,friend.groupId,friend.friendAccount,groups.groupName,groups.peopleNum,user.username,user.online';
@@ -198,69 +145,12 @@ io.sockets.on('connection',function (socket) {
                         });
                     });
 
-                    // db.query('select * from groups where account='+data.account,function (res2) {
-                    //     let groupList=[];
-                    //     let count=0;
-                    //     if(res2.length >= 1){
-                    //         for(let item of res2){
-                    //             let thisGroup={};
-                    //             let count2=0;
-                    //             let onlineNum=0;
-                    //             thisGroup.id=item.groupId;
-                    //             thisGroup.groupName=item.groupName;
-                    //             thisGroup.peopleNum=item.peopleNum;
-                    //             thisGroup.peopleList=[];
-                    //             db.query('select * from friend where account='+data.account+' and groupId='+item.groupId,function (res3) {
-                    //                 if(res3.length >= 1){
-                    //                     for(let item2 of res3){
-                    //                         let thisFriend={};
-                    //                         db.query('select username,online from user where account='+item2.friendAccount,function (res4) {
-                    //                             if(res4.length === 1){
-                    //                                 if(res4[0].online === 1){
-                    //                                     onlineNum+=1;
-                    //                                 }
-                    //                                 thisFriend.name=res4[0].username;
-                    //                                 thisFriend.id=res4[0].account;
-                    //                                 thisGroup.peopleList.push(thisFriend);
-                    //                                 count2+=1;
-                    //                                 if(count2 === res3.length){
-                    //                                     thisGroup.onlineNum=onlineNum;
-                    //                                     groupList.push(thisGroup);
-                    //                                     count+=1;
-                    //                                 }
-                    //
-                    //                                 if(count === res2.length){
-                    //                                     socket.emit('getGroupList',{
-                    //                                         groupList:groupList
-                    //                                     });
-                    //                                 }
-                    //                             }
-                    //                         })
-                    //                     }
-                    //                 }else{
-                    //                     thisGroup.onlineNum=onlineNum;
-                    //                     groupList.push(thisGroup);
-                    //                     count+=1;
-                    //                     if(count === res2.length){
-                    //                         socket.emit('getGroupList',{
-                    //                             groupList:groupList
-                    //                         });
-                    //                     }
-                    //                 }
-                    //             })
-                    //         }
-                    //     }else{
-                    //         socket.emit('getGroupList',{
-                    //             groupList:groupList
-                    //         });
-                    //     }
-                    // });
 
                     //监听事件，发送历史消息
-                    socket.on('getMemory',function (data2) {
+                    socket.on('getMemory',function (data2,fn) {
                         let sqllan='select * from memory join user on memory.talker=user.account where memoryId in ';
                         sqllan+='(select memoryId from friend where account='+data.account+' and friendAccount='+data2.friendAccount+')';
-                        sqllan+=' order by time desc limit 5';
+                        sqllan+=' order by time desc limit '+data2.num;
                         db.query(sqllan,function (res2) {
                             if(res2.length >= 1){
                                 let wordList=[];
@@ -281,9 +171,13 @@ io.sockets.on('connection',function (socket) {
                                         socket.emit('sendMemory',{
                                             wordList:wordList
                                         });
+                                        fn();
                                     }
                                 }
                             }
+                        });
+                        db.query('update friend set nonRead=0 where account='+data.account+' and friendAccount='+data2.friendAccount,function () {
+                            sendFriendList();
                         });
                     });
 
@@ -300,9 +194,20 @@ io.sockets.on('connection',function (socket) {
                                             flag:true
                                         })
                                     }
-                                })
+                                    db.query('update friend set nonRead=nonRead+1 where account='+data2.talker+' and friendAccount='+data.account,function () {
+                                        if(data2.talker in users){
+                                            users[data2.talker].emit('changeMsgList',{flag:1});
+                                        }
+                                    });
+                                    sendFriendList();
+                                });
                             }
                         })
+                    });
+
+                    //刷新信息列表
+                    socket.on('wantMsgList',function () {
+                        sendFriendList();
                     });
 
                     //关闭连接的时候改变账号状态
