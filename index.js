@@ -57,7 +57,7 @@ io.sockets.on('connection',function (socket) {
                     //修改账号状态
                     db.query('UPDATE user SET online=1 where account='+data.account,(res2) => {});
 
-                    //获取并发送信息列表
+                    //获取并发送私信列表
                     //获取朋友列表
                     function sendFriendList(){
                         let sqllan2='select friend.friendAccount,friend.nonRead,user.username,memory.talker,memory.time,memory.msg,memory.memoryId';
@@ -145,8 +145,70 @@ io.sockets.on('connection',function (socket) {
                         });
                     });
 
+                    //获取并发送群组列表
+                    function getCrowdList(){
+                        let sqllan='select id,name from crowds where id in ';
+                        sqllan+='(select crowdId from crowdPeople where account='+data.account+')';
+                        db.query(sqllan,function (res2) {
+                           if(res2.length >= 1){
+                               let crowdList=[];
+                               for(let item of res2){
+                                   crowdList.push({
+                                       id:item.id,
+                                       name:item.name
+                                   });
+                               }
+                               socket.emit('getCrowdList',{
+                                   crowdList:crowdList
+                               });
+                           }
+                        });
+                    }
+                    getCrowdList();
 
-                    //监听事件，发送历史消息
+                    //获取并发送群组消息列表
+                    function sendCrowdMsg(){
+                        let sqllan='select crowds.id,crowds.name,crowdPeople.nonRead,user.username,memory.talker,memory.time,memory.msg,memory.memoryId ';
+                        sqllan+='from crowdPeople join crowds on crowdPeople.crowdId=crowds.id ';
+                        sqllan+='join memory on memory.memoryId=crowds.memoryId ';
+                        sqllan+='join user on user.account=memory.talker ';
+                        sqllan+='where crowdPeople.account='+data.account;
+                        sqllan+=' order by memory.time desc';
+                        db.query(sqllan,function (res2) {
+                            if(res2.length >= 1){
+                                let crowdMsg=[];
+                                let crowds={};
+                                for(let item of res2){
+                                    if(item.id in crowds){
+                                    }else{
+                                        crowds[item.id]=item.name;
+                                        let thisMsg={};
+                                        thisMsg.id=item.id;
+                                        thisMsg.name=item.name;
+                                        thisMsg.nonRead=item.nonRead;
+                                        thisMsg.lastMsg={};
+                                        thisMsg.lastMsg.talker=item.username;
+
+                                        var nowTime=new Date().Format('dd/MM/yyyy');
+                                        if(nowTime ===item.time.Format('dd/MM/yyyy')){
+                                            thisMsg.lastMsg.time=item.time.Format('hh:mm');
+                                        }else{
+                                            thisMsg.lastMsg.time=item.time.Format('yyyy/MM/dd');
+                                        }
+                                        thisMsg.lastMsg.msg=item.msg;
+
+                                        crowdMsg.push(thisMsg);
+                                    }
+                                }
+                                socket.emit('getCrowdMsgList',{
+                                    crowdMsg:crowdMsg
+                                });
+                            }
+                        })
+                    }
+                    sendCrowdMsg();
+
+                    //监听事件，发送私信的历史消息
                     socket.on('getMemory',function (data2,fn) {
                         let sqllan='select * from memory join user on memory.talker=user.account where memoryId in ';
                         sqllan+='(select memoryId from friend where account='+data.account+' and friendAccount='+data2.friendAccount+')';
@@ -181,6 +243,41 @@ io.sockets.on('connection',function (socket) {
                         });
                     });
 
+                    //监听事件，发送群组的历史消息
+                    socket.on('getMemory2',function (data2,fn) {
+                        let sqllan='select * from memory join user on memory.talker=user.account where memoryId in ';
+                        sqllan+='(select memoryId from crowds where id='+data2.id+')';
+                        sqllan+=' order by time desc limit '+data2.num;
+                        db.query(sqllan,function (res2) {
+                            if(res2.length >= 1){
+                                let wordList=[];
+                                for(let i=res2.length-1;i>=0;i--){
+                                    let thisWord={};
+                                    let item=res2[i];
+                                    thisWord.name=item.username;
+                                    var nowTime=new Date().Format('dd/MM/yyyy');
+                                    if(nowTime === item.time.Format('dd/MM/yyyy')){
+                                        thisWord.time=item.time.Format('hh:mm');
+                                    }else{
+                                        thisWord.time=item.time.Format('MM-dd');
+                                    }
+
+                                    thisWord.msg=item.msg;
+                                    wordList.push(thisWord);
+                                    if(i === 0){
+                                        socket.emit('sendMemory',{
+                                            wordList:wordList
+                                        });
+                                        fn();
+                                    }
+                                }
+                            }
+                        });
+                        db.query('update crowdPeople set nonRead=0 where account='+data.account+' and crowdId='+data2.id,function () {
+                            sendCrowdMsg();
+                        });
+                    });
+
                     //接收消息并发送给对方
                     socket.on('sendMsg',function (data2) {
                         db.query('select memoryId from friend where account='+data.account+' and friendAccount='+data2.talker,function (res2) {
@@ -196,7 +293,7 @@ io.sockets.on('connection',function (socket) {
                                     }
                                     db.query('update friend set nonRead=nonRead+1 where account='+data2.talker+' and friendAccount='+data.account,function () {
                                         if(data2.talker in users){
-                                            users[data2.talker].emit('changeMsgList',{flag:1});
+                                            users[data2.talker].emit('changeMsgList');
                                         }
                                     });
                                     sendFriendList();
@@ -205,9 +302,44 @@ io.sockets.on('connection',function (socket) {
                         })
                     });
 
+                    //接收群组消息并分发给群组好友
+                    socket.on('sendMsg2',function (data2) {
+                        db.query('select memoryId from crowds where id='+data2.talker,function (res2) {
+                            if(res2.length === 1){
+                                db.query('insert into memory(memoryId,talker,msg) values('+res2[0].memoryId+',"'+data.account+'","'+data2.msg+'")',function () {
+                                    //告知TBN组件发送消息成功
+                                    socket.emit('gotMsg',{
+                                        flag:true
+                                    });
+                                    //推送消息给其他人
+                                    db.query('select account from crowdPeople where crowdId='+data2.talker,function (res3) {
+                                       if(res3.length >= 1){
+                                           for(let item of res3){
+                                               if(item.account !== data.account){
+                                                   if(item.account in users){
+                                                       users[item.account].emit('reciveMsg',{
+                                                           flag:true
+                                                       });
+                                                       db.query('update crowdPeople set nonRead=nonRead+1 where account='+item.account+' and crowdId='+data2.talker,function () {
+                                                           users[item.account].emit('changeCrowdMsg');
+                                                       });
+                                                   }
+                                               }
+                                           }
+                                           sendCrowdMsg();
+                                       }
+                                    });
+                                });
+                            }
+                        })
+                    })
+
                     //刷新信息列表
                     socket.on('wantMsgList',function () {
                         sendFriendList();
+                    });
+                    socket.on('wantCrowdMsg',function () {
+                        sendCrowdMsg();
                     });
 
                     //关闭连接的时候改变账号状态
